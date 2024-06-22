@@ -37,10 +37,10 @@ def calculate_and_display_results(df_top_map, df_bottom_map, scaling_factor):
 # Streamlit app
 st.title("Torque and Airflow Map Correlation Calculator")
 
-# Axis data based on provided example
-rpm_values = [550, 650, 800, 1000, 1300, 1500, 2000, 2500, 3000, 3500, 4000, 4500, 5000, 5200, 5500, 6000, 6600]
-mg_stk_values = [20, 40, 60, 80, 100, 120, 140, 160, 180, 200, 220, 240, 260, 280, 300, 320, 340]
-nm_values = [50, 100, 150, 200, 250, 300, 350, 400, 450, 500, 550, 600, 650, 700, 750, 800, 850]
+# Axis data based on provided example (18 values for a 18x18 grid)
+rpm_values = [550, 650, 800, 1000, 1300, 1500, 2000, 2500, 3000, 3500, 4000, 4500, 5000, 5200, 5500, 6000, 6600, 6800]
+mg_stk_values = [20, 40, 60, 80, 100, 120, 140, 160, 180, 200, 220, 240, 260, 280, 300, 320, 340, 360]
+nm_values = [50, 100, 150, 200, 250, 300, 350, 400, 450, 500, 550, 600, 650, 700, 750, 800, 850, 900]
 
 # Input for Top Map
 st.write("## Input Top Map Data")
