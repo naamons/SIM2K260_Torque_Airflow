@@ -1,33 +1,37 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
+import io
 
-def parse_pasted_data(data):
+def load_excel_data(uploaded_file):
     try:
-        # Split the data into lines
-        lines = data.strip().split('\n')
+        # Read Excel file
+        xls = pd.ExcelFile(uploaded_file)
         
-        # Extract headers and data
-        headers = lines[0].split()
-        data_rows = [line.split() for line in lines[1:]]
+        # Check if both required sheets are present
+        if 'Torque Map' not in xls.sheet_names or 'MAF Map' not in xls.sheet_names:
+            st.error("Excel file must contain sheets named 'Torque Map' and 'MAF Map'")
+            return None, None
+
+        # Read Torque Map
+        torque_df = pd.read_excel(xls, 'Torque Map', index_col=0)
         
-        # Create DataFrame
-        df = pd.DataFrame(data_rows, columns=headers)
-        
-        # Set the first column (RPM) as index
-        df = df.set_index(df.columns[0])
+        # Read MAF Map
+        maf_df = pd.read_excel(xls, 'MAF Map', index_col=0)
         
         # Convert all data to float
-        for col in df.columns:
-            df[col] = pd.to_numeric(df[col], errors='coerce')
+        for df in [torque_df, maf_df]:
+            for col in df.columns:
+                df[col] = pd.to_numeric(df[col], errors='coerce')
+            
+            # Drop any columns or rows that are entirely NaN
+            df.dropna(how='all', axis=1, inplace=True)
+            df.dropna(how='all', axis=0, inplace=True)
         
-        # Drop any columns or rows that are entirely NaN
-        df = df.dropna(how='all', axis=1).dropna(how='all', axis=0)
-        
-        return df
+        return torque_df, maf_df
     except Exception as e:
-        st.error(f"Error parsing data: {str(e)}")
-        return None
+        st.error(f"Error loading Excel file: {str(e)}")
+        return None, None
 
 def scale_data(df, scale_factor, inverse=False):
     if inverse:
@@ -37,14 +41,11 @@ def scale_data(df, scale_factor, inverse=False):
 
 st.title('Engine Map Scaling App')
 
-# Text areas for pasting data
-torque_data = st.text_area("Paste your Torque Map data here:")
-maf_data = st.text_area("Paste your Mass Air Flow Map data here:")
+# File uploader
+uploaded_file = st.file_uploader("Choose an Excel file", type="xlsx")
 
-# Parse pasted data when available
-if torque_data and maf_data:
-    torque_df = parse_pasted_data(torque_data)
-    maf_df = parse_pasted_data(maf_data)
+if uploaded_file is not None:
+    torque_df, maf_df = load_excel_data(uploaded_file)
 
     if torque_df is not None and maf_df is not None:
         # Sidebar for user input
@@ -77,28 +78,26 @@ if torque_data and maf_data:
         # Visualization of scaling
         st.subheader('Visualization of Scaling')
         chart_data = pd.DataFrame({
+            'Original Torque': torque_df.iloc[:, 0],
+            'Scaled Torque': scaled_torque_df.iloc[:, 0],
             'Original MAF': maf_df.iloc[:, 0],
             'Scaled MAF': scaled_maf_df.iloc[:, 0]
         })
         st.line_chart(chart_data)
 
-        # Add download buttons for scaled data
-        torque_csv = scaled_torque_df.to_csv().encode('utf-8')
-        st.download_button(
-            label="Download Scaled Torque Map as CSV",
-            data=torque_csv,
-            file_name="scaled_torque_map.csv",
-            mime="text/csv",
-        )
+        # Create a BytesIO object to store the Excel file
+        output = io.BytesIO()
+        with pd.ExcelWriter(output, engine='openpyxl') as writer:
+            scaled_torque_df.to_excel(writer, sheet_name='Scaled Torque Map')
+            scaled_maf_df.to_excel(writer, sheet_name='Scaled MAF Map')
+        output.seek(0)
 
-        maf_csv = scaled_maf_df.to_csv().encode('utf-8')
+        # Add download button for scaled data
         st.download_button(
-            label="Download Scaled MAF Map as CSV",
-            data=maf_csv,
-            file_name="scaled_maf_map.csv",
-            mime="text/csv",
+            label="Download Scaled Maps as Excel",
+            data=output,
+            file_name="scaled_engine_maps.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         )
-    else:
-        st.error("Unable to parse the pasted data. Please check the format and try again.")
 else:
-    st.write("Please paste your data into both text areas above.")
+    st.write("Please upload an Excel file containing 'Torque Map' and 'MAF Map' sheets.")
