@@ -58,8 +58,8 @@ if st.button("Calculate"):
     if top_map_data and bottom_map_data:
         try:
             # Convert input data to DataFrames
-            df_top_map = pd.read_csv(io.StringIO(top_map_data), header=None)
-            df_bottom_map = pd.read_csv(io.StringIO(bottom_map_data), header=None)
+            df_top_map = pd.read_csv(io.StringIO(top_map_data), sep="\t", header=None)
+            df_bottom_map = pd.read_csv(io.StringIO(bottom_map_data), sep="\t", header=None)
             
             # Assign the axis data
             df_top_map.columns = mg_stk_values
