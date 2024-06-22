@@ -1,7 +1,6 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import io
 
 def parse_pasted_data(data):
     try:
@@ -9,16 +8,14 @@ def parse_pasted_data(data):
         lines = data.strip().split('\n')
         
         # Extract headers and data
-        headers = lines[0].split()[1:]  # Skip the first column header (RPM)
+        headers = lines[0].split()
         data_rows = [line.split() for line in lines[1:]]
         
-        # Ensure all rows have the same number of columns
-        max_cols = max(len(row) for row in data_rows)
-        data_rows = [row + ['0'] * (max_cols - len(row)) for row in data_rows]
-        
         # Create DataFrame
-        df = pd.DataFrame(data_rows, columns=['RPM'] + headers)
-        df = df.set_index('RPM')
+        df = pd.DataFrame(data_rows, columns=headers)
+        
+        # Set the first column (RPM) as index
+        df = df.set_index(df.columns[0])
         
         # Convert all data to float
         for col in df.columns:
@@ -80,8 +77,6 @@ if torque_data and maf_data:
         # Visualization of scaling
         st.subheader('Visualization of Scaling')
         chart_data = pd.DataFrame({
-            'Original Torque': torque_df.iloc[:, 0],
-            'Scaled Torque': scaled_torque_df.iloc[:, 0],
             'Original MAF': maf_df.iloc[:, 0],
             'Scaled MAF': scaled_maf_df.iloc[:, 0]
         })
