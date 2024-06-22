@@ -1,76 +1,95 @@
 import streamlit as st
 import pandas as pd
+import numpy as np
 import io
 
-# Function to calculate correlation and add scaling factor
-def calculate_and_display_results(df_top_map, df_bottom_map, scaling_factor):
-    # Ensure the data is numerical
-    df_top_map = df_top_map.apply(pd.to_numeric, errors='coerce')
-    df_bottom_map = df_bottom_map.apply(pd.to_numeric, errors='coerce')
+def parse_pasted_data(data):
+    # Split the data into lines
+    lines = data.strip().split('\n')
     
-    # Calculate the correlation matrix between the two maps
-    correlation_matrix = df_top_map.corrwith(df_bottom_map, axis=1)
+    # Extract headers and data
+    headers = lines[0].split()[1:]  # Skip the first column header (RPM)
+    data_rows = [line.split() for line in lines[1:]]
     
-    # Display the DataFrames
-    st.write("### Top Map DataFrame")
-    st.write(df_top_map)
+    # Create DataFrame
+    df = pd.DataFrame(data_rows, columns=['RPM'] + headers)
+    df = df.set_index('RPM')
     
-    st.write("### Bottom Map DataFrame")
-    st.write(df_bottom_map)
+    # Convert all data to float
+    for col in df.columns:
+        df[col] = df[col].astype(float)
     
-    st.write("### Correlation Matrix")
-    st.write(correlation_matrix.to_frame('Correlation'))
-    
-    # Display scaling factor
-    st.write(f"### Scaling Factor: {scaling_factor}")
-    
-    # Apply scaling factor to the top map
-    scaled_top_map = df_top_map * scaling_factor
-    st.write("### Scaled Top Map DataFrame")
-    st.write(scaled_top_map)
-    
-    # Apply scaling factor to the bottom map
-    scaled_bottom_map = df_bottom_map * scaling_factor
-    st.write("### Scaled Bottom Map DataFrame")
-    st.write(scaled_bottom_map)
+    return df
 
-# Streamlit app
-st.title("Torque and Airflow Map Correlation Calculator")
-
-# Axis data based on provided example (18 values for a 18x18 grid)
-rpm_values = [550, 650, 800, 1000, 1300, 1500, 2000, 2500, 3000, 3500, 4000, 4500, 5000, 5200, 5500, 6000, 6600, 6800]
-mg_stk_values = [20, 40, 60, 80, 100, 120, 140, 160, 180, 200, 220, 240, 260, 280, 300, 320, 340, 360]
-nm_values = [50, 100, 150, 200, 250, 300, 350, 400, 450, 500, 550, 600, 650, 700, 750, 800, 850, 900]
-
-# Input for Top Map
-st.write("## Input Top Map Data")
-top_map_data = st.text_area("Paste the Top Map data here (CSV format):", height=200)
-
-# Input for Bottom Map
-st.write("## Input Bottom Map Data")
-bottom_map_data = st.text_area("Paste the Bottom Map data here (CSV format):", height=200)
-
-# Input for Scaling Factor
-scaling_factor = st.number_input("Scaling Factor:", value=1.0)
-
-# Process data when the button is clicked
-if st.button("Calculate"):
-    if top_map_data and bottom_map_data:
-        try:
-            # Convert input data to DataFrames
-            df_top_map = pd.read_csv(io.StringIO(top_map_data), sep="\t", header=None)
-            df_bottom_map = pd.read_csv(io.StringIO(bottom_map_data), sep="\t", header=None)
-            
-            # Assign the axis data
-            df_top_map.columns = mg_stk_values
-            df_top_map.index = rpm_values
-            df_bottom_map.columns = nm_values
-            df_bottom_map.index = rpm_values
-            
-            # Calculate and display results
-            calculate_and_display_results(df_top_map, df_bottom_map, scaling_factor)
-        
-        except Exception as e:
-            st.error(f"Error processing data: {e}")
+def scale_data(df, scale_factor, inverse=False):
+    if inverse:
+        return df * (1 / scale_factor)
     else:
-        st.error("Please paste data for both maps.")
+        return df * scale_factor
+
+st.title('Engine Map Scaling App')
+
+# Text areas for pasting data
+torque_data = st.text_area("Paste your Torque Map data here:")
+maf_data = st.text_area("Paste your Mass Air Flow Map data here:")
+
+# Parse pasted data when available
+if torque_data and maf_data:
+    torque_df = parse_pasted_data(torque_data)
+    maf_df = parse_pasted_data(maf_data)
+
+    # Sidebar for user input
+    scale_factor = st.sidebar.slider('Scaling Factor', 0.5, 2.0, 1.0, 0.1)
+
+    # Scale the data
+    scaled_torque_df = scale_data(torque_df, scale_factor)
+    scaled_maf_df = scale_data(maf_df, scale_factor, inverse=True)
+
+    # Display original and scaled data for Torque Map
+    st.subheader('Torque Map')
+    col1, col2 = st.columns(2)
+    with col1:
+        st.write("Original")
+        st.dataframe(torque_df)
+    with col2:
+        st.write("Scaled")
+        st.dataframe(scaled_torque_df)
+
+    # Display original and scaled data for MAF Map
+    st.subheader('Mass Air Flow Map')
+    col1, col2 = st.columns(2)
+    with col1:
+        st.write("Original")
+        st.dataframe(maf_df)
+    with col2:
+        st.write("Scaled")
+        st.dataframe(scaled_maf_df)
+
+    # Visualization of scaling
+    st.subheader('Visualization of Scaling')
+    chart_data = pd.DataFrame({
+        'Original Torque': torque_df.iloc[:, 0],
+        'Scaled Torque': scaled_torque_df.iloc[:, 0],
+        'Original MAF': maf_df.iloc[:, 0],
+        'Scaled MAF': scaled_maf_df.iloc[:, 0]
+    })
+    st.line_chart(chart_data)
+
+    # Add download buttons for scaled data
+    torque_csv = scaled_torque_df.to_csv().encode('utf-8')
+    st.download_button(
+        label="Download Scaled Torque Map as CSV",
+        data=torque_csv,
+        file_name="scaled_torque_map.csv",
+        mime="text/csv",
+    )
+
+    maf_csv = scaled_maf_df.to_csv().encode('utf-8')
+    st.download_button(
+        label="Download Scaled MAF Map as CSV",
+        data=maf_csv,
+        file_name="scaled_maf_map.csv",
+        mime="text/csv",
+    )
+else:
+    st.write("Please paste your data into both text areas above.")
