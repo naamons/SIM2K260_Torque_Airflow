@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+import io
 
 # Function to calculate correlation and add scaling factor
 def calculate_and_display_results(df_top_map, df_bottom_map, scaling_factor):
@@ -48,8 +49,8 @@ if st.button("Calculate"):
     if top_map_data and bottom_map_data:
         try:
             # Convert input data to DataFrames
-            df_top_map = pd.read_csv(pd.compat.StringIO(top_map_data))
-            df_bottom_map = pd.read_csv(pd.compat.StringIO(bottom_map_data))
+            df_top_map = pd.read_csv(io.StringIO(top_map_data))
+            df_bottom_map = pd.read_csv(io.StringIO(bottom_map_data))
             
             # Calculate and display results
             calculate_and_display_results(df_top_map, df_bottom_map, scaling_factor)
